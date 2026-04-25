@@ -9,17 +9,20 @@ const CLAUDE_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const LANG_NAMES: Record<string, string> = {
-  auto: 'auto-detect from form labels',
   ko: '한국어 (Korean)',
   en: 'English',
-  zh: '中文简体 (Simplified Chinese)',
-  ja: '日本語 (Japanese)',
-  es: 'Español (Spanish)',
   fr: 'Français (French)',
-  ar: 'العربية (Arabic)',
-  hi: 'हिन्दी (Hindi)',
+  it: 'Italiano (Italian)',
+  de: 'Deutsch (German)',
+  es: 'Español (Spanish)',
+  'zh-Hans': '中文简体 (Simplified Chinese)',
+  'zh-Hant': '中文繁體 (Traditional Chinese)',
+  ja: '日本語 (Japanese)',
+  'pt-BR': 'Português do Brasil (Brazilian Portuguese)',
   pt: 'Português (Portuguese)',
   ru: 'Русский (Russian)',
+  id: 'Bahasa Indonesia (Indonesian)',
+  hi: 'हिन्दी (Hindi)',
 };
 
 // ── ASC 전용 시스템 프롬프트 ──────────────────────────────────────────
@@ -323,13 +326,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const lang = LANG_NAMES[msg.targetLanguage] ?? msg.targetLanguage;
     const lines = Object.entries(msg.values)
       .filter(([, v]) => v.value.trim())
-      .map(([selector, { label, value }]) => `${selector} [${label}]: ${value}`)
+      .map(([selector, { label, value, maxLength }]) =>
+        `${selector} [${label}]${maxLength ? ` (max ${maxLength} chars)` : ''}: ${value}`)
       .join('\n');
 
     const systemPrompt = `You are a translator. Translate form field values to the target language.
 Return ONLY valid JSON where every value is a plain translated STRING (never an object).
 Example: {"#field1": "translated text", "#field2": "translated text"}
-Keep URLs, emails, and phone numbers exactly as-is.`;
+Keep URLs, emails, and phone numbers exactly as-is.
+If a field specifies a character limit (max N chars), the translated text MUST NOT exceed that limit — shorten meaningfully if needed, never truncate mid-word.`;
 
     const userPrompt = `TARGET LANGUAGE: ${lang}
 

@@ -6,7 +6,7 @@ import { useStorage } from '../hooks/useStorage';
 
 const FILL_LANG_OPTIONS = [
   { code: 'direct', label: '직접 입력' },
-  ...SUPPORTED_LANGUAGES.filter((l) => l.code !== 'auto'),
+  ...SUPPORTED_LANGUAGES,
 ];
 
 type PresetValues = Record<string, string>;
@@ -130,12 +130,12 @@ export default function InfoTab() {
       const fieldMap: Record<string, EditableField> = {};
       for (const f of currentPreset.fields) fieldMap[f.selector] = f;
 
-      const translateValues: Record<string, { label: string; value: string }> = {};
+      const translateValues: Record<string, { label: string; value: string; maxLength?: number }> = {};
       for (const [sel, val] of Object.entries(values)) {
         if (!val) continue;
         const f = fieldMap[sel];
         const label = f?.label || f?.placeholder || f?.ariaLabel || sel;
-        translateValues[sel] = { label, value: val };
+        translateValues[sel] = { label, value: val, ...(f?.maxLength ? { maxLength: f.maxLength } : {}) };
       }
       if (!Object.keys(translateValues).length) { showStatus('입력된 값이 없습니다.', true); return; }
 
@@ -245,12 +245,21 @@ export default function InfoTab() {
 
     // ── textarea ──
     if (f.type === 'textarea') {
+      const curLen = (values[f.selector] ?? '').length;
       return (
         <div key={f.selector} className="info-field">
-          <label className="meta-label">{dispLabel(f)}</label>
+          <label className="meta-label">
+            {dispLabel(f)}
+            {f.maxLength && (
+              <span className={`info-charcount${curLen > f.maxLength ? ' info-charcount--over' : ''}`}>
+                {curLen}/{f.maxLength}
+              </span>
+            )}
+          </label>
           <textarea
             className="meta-textarea"
             rows={3}
+            maxLength={f.maxLength}
             value={values[f.selector] ?? ''}
             onChange={(e) => handleChange(f.selector, e.target.value)}
           />
@@ -259,12 +268,21 @@ export default function InfoTab() {
     }
 
     // ── 일반 input ──
+    const curLen = (values[f.selector] ?? '').length;
     return (
       <div key={f.selector} className="info-field">
-        <label className="meta-label">{dispLabel(f)}</label>
+        <label className="meta-label">
+          {dispLabel(f)}
+          {f.maxLength && (
+            <span className={`info-charcount${curLen > f.maxLength ? ' info-charcount--over' : ''}`}>
+              {curLen}/{f.maxLength}
+            </span>
+          )}
+        </label>
         <input
           className="meta-input"
           type={f.type === 'password' ? 'password' : 'text'}
+          maxLength={f.maxLength}
           value={values[f.selector] ?? ''}
           onChange={(e) => handleChange(f.selector, e.target.value)}
         />

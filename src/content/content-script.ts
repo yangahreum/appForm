@@ -79,6 +79,45 @@ function isVisible(el: HTMLElement): boolean {
   return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
 }
 
+function getMaxLength(el: HTMLElement): number | undefined {
+  // 1. HTML maxlength 속성
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    if (el.maxLength > 0) return el.maxLength;
+  }
+
+  // 2. 근처 요소에서 "0/30" 또는 "최대 N자" 패턴 탐색
+  const counterPattern = /\b(\d+)\s*\/\s*(\d+)\b/;
+  const hintPattern = /최대\s*(\d+)\s*(?:자|글자|characters?)|max(?:imum)?\s*(\d+)\s*(?:char|글자|자)/i;
+
+  const candidates: Element[] = [];
+  if (el.nextElementSibling) candidates.push(el.nextElementSibling);
+  if (el.previousElementSibling) candidates.push(el.previousElementSibling);
+  const parent = el.parentElement;
+  if (parent) {
+    candidates.push(...Array.from(parent.children).filter((c) => c !== el));
+    const grandParent = parent.parentElement;
+    if (grandParent) {
+      candidates.push(...Array.from(grandParent.children).filter((c) => c !== parent));
+    }
+  }
+
+  for (const candidate of candidates) {
+    const text = candidate.textContent?.trim() ?? '';
+    const m1 = text.match(counterPattern);
+    if (m1) {
+      const num = parseInt(m1[2], 10); // "현재/최대" 중 최대값
+      if (!isNaN(num) && num > 0) return num;
+    }
+    const m2 = text.match(hintPattern);
+    if (m2) {
+      const num = parseInt(m2[1] ?? m2[2], 10);
+      if (!isNaN(num) && num > 0) return num;
+    }
+  }
+
+  return undefined;
+}
+
 function scanFormFields(): FormField[] {
   const query = [
     'input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]):not([type=image]):not([type=file])',
@@ -106,6 +145,7 @@ function scanFormFields(): FormField[] {
             ? el.value
             : undefined,
       radioValue: el instanceof HTMLInputElement && el.type === 'radio' ? el.value : undefined,
+      maxLength: getMaxLength(el),
     }));
 }
 

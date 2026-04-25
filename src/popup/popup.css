@@ -713,6 +713,54 @@ html, body {
   border-radius: 3px;
 }
 
+.pf-val-tag {
+  font-size: 9px;
+  color: #059669;
+  background: #d1fae5;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.pf-maxlength-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 2px;
+}
+
+.pf-maxlength-label {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.pf-maxlength-input {
+  width: 80px;
+  padding: 3px 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #374151;
+}
+
+.pf-maxlength-input:focus {
+  outline: none;
+  border-color: #a5b4fc;
+}
+
+.info-charcount {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #9ca3af;
+}
+
+.info-charcount--over {
+  color: #ef4444;
+  font-weight: 600;
+}
+
 .pf-label-edit {
   flex: 1;
   padding: 3px 6px;
@@ -826,6 +874,7 @@ html, body {
 }
 .pf-save-btn:hover { background: #ede9fe; }
 .pf-save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pf-save-btn--full { width: 100%; margin-top: 4px; padding: 9px; }
 
 .pf-apply-btn {
   padding: 6px 14px;

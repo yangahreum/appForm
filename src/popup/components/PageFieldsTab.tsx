@@ -1,13 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { EditableField, FieldPreset, FillMap } from '../../shared/types';
+import type { EditableField, FieldPreset } from '../../shared/types';
 import { SUPPORTED_LANGUAGES } from '../../shared/types';
-import type { MsgFillRequest, MsgFillResponse, MsgApplyFill, MsgApplyFillResponse } from '../../shared/messages';
-import { useStorage } from '../hooks/useStorage';
-import { DEFAULT_APP_METADATA, DEFAULT_REVIEW_INFO } from '../../shared/types';
 
 const PRESET_LANG_OPTIONS = [
   { code: 'direct', label: '직접 입력' },
-  ...SUPPORTED_LANGUAGES.filter((l) => l.code !== 'auto'),
+  ...SUPPORTED_LANGUAGES,
 ];
 
 function genId() {
@@ -15,18 +12,6 @@ function genId() {
 }
 
 export default function PageFieldsTab() {
-  const [appMetadata] = useStorage('appMetadata', DEFAULT_APP_METADATA);
-  const [reviewInfo] = useStorage('reviewInfo', DEFAULT_REVIEW_INFO);
-  const [aiModel] = useStorage<string>('aiModel', 'minimax');
-  const [minimaxApiKey] = useStorage<string>('minimaxApiKey', '');
-  const [claudeApiKey] = useStorage<string>('claudeApiKey', '');
-  const [geminiApiKey] = useStorage<string>('geminiApiKey', '');
-  const [targetLanguage] = useStorage<string>('targetLanguage', 'auto');
-
-  const apiKey = aiModel.startsWith('claude') ? claudeApiKey
-    : aiModel.startsWith('gemini') ? geminiApiKey
-    : minimaxApiKey;
-
   // ── 프리셋 ────────────────────────────────────────────────────────────
   const [presets, setPresets] = useState<FieldPreset[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -36,19 +21,15 @@ export default function PageFieldsTab() {
 
   // ── 필드 ──────────────────────────────────────────────────────────────
   const [fields, setFields] = useState<EditableField[]>([]);
+  const [scannedValues, setScannedValues] = useState<Record<string, string>>({});
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editingLabel, setEditingLabel] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [addSelector, setAddSelector] = useState('');
   const [addLabel, setAddLabel] = useState('');
 
-  // ── 입력 모드 ─────────────────────────────────────────────────────────
-  const [fillMode, setFillMode] = useState<'ai' | 'direct'>('ai');
-  const [values, setValues] = useState<Record<string, string>>({});
-
   // ── 상태 ──────────────────────────────────────────────────────────────
   const [scanning, setScanning] = useState(false);
-  const [applying, setApplying] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [isErr, setIsErr] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -73,9 +54,20 @@ export default function PageFieldsTab() {
     chrome.storage.local.set({ fieldPresets: map });
   }, []);
 
+  const savePresetValues = useCallback((presetId: string, vals: Record<string, string>) => {
+    if (!Object.keys(vals).length) return;
+    chrome.storage.local.get('presetValues', (data) => {
+      const all = data.presetValues ?? {};
+      // 기존 저장값이 없을 때만 스캔값으로 초기 세팅
+      if (!all[presetId]) {
+        all[presetId] = vals;
+        chrome.storage.local.set({ presetValues: all });
+      }
+    });
+  }, []);
+
   // ── 페이지 스캔 ───────────────────────────────────────────────────────
   const BLOCKED_ORIGINS = ['chrome://', 'chrome-extension://', 'chromewebstore.google.com', 'chrome.google.com/webstore', 'about:', 'edge://'];
-
   const isBlockedUrl = (url: string) => BLOCKED_ORIGINS.some((o) => url.includes(o));
 
   const scanPage = async () => {
@@ -98,7 +90,7 @@ export default function PageFieldsTab() {
       for (const f of res.fields) {
         if (f.currentValue) existing[f.selector] = f.currentValue;
       }
-      setValues(existing);
+      setScannedValues(existing);
     } catch (e) {
       showStatus(e instanceof Error ? e.message : '스캔 오류', true);
     }
@@ -113,7 +105,7 @@ export default function PageFieldsTab() {
       setNameInput('');
       setPresetLang('direct');
       setFields([]);
-      setValues({});
+      setScannedValues({});
       return;
     }
     const preset = presets.find((p) => p.id === val);
@@ -122,7 +114,7 @@ export default function PageFieldsTab() {
       setNameInput(preset.name);
       setPresetLang(preset.lang ?? 'direct');
       setFields(preset.fields);
-      setValues({});
+      setScannedValues({});
       setMode('view');
     }
   };
@@ -139,6 +131,7 @@ export default function PageFieldsTab() {
       const updated = [np, ...presets];
       setPresets(updated);
       persistPresets(updated);
+      savePresetValues(np.id, scannedValues);
       setSelectedId(np.id);
       setMode('view');
     } else {
@@ -149,6 +142,7 @@ export default function PageFieldsTab() {
       );
       setPresets(updated);
       persistPresets(updated);
+      if (Object.keys(scannedValues).length) savePresetValues(selectedId, scannedValues);
       setMode('view');
     }
     showStatus('저장됐습니다.');
@@ -182,6 +176,13 @@ export default function PageFieldsTab() {
 
   const removeField = (idx: number) => setFields((prev) => prev.filter((_, i) => i !== idx));
 
+  const updateMaxLength = (idx: number, val: string) => {
+    const num = val === '' ? undefined : Math.max(1, parseInt(val, 10) || 1);
+    setFields((prev) => prev.map((f, i) => (i === idx ? { ...f, maxLength: num } : f)));
+  };
+
+  const TEXT_TYPES = ['input', 'text', 'textarea', 'password', 'email', 'url', 'search', 'number', 'tel'];
+
   const addManualField = () => {
     if (!addSelector.trim()) return;
     setFields((prev) => [
@@ -191,47 +192,6 @@ export default function PageFieldsTab() {
     setAddSelector('');
     setAddLabel('');
     setShowAdd(false);
-  };
-
-  // ── AI 자동입력 ───────────────────────────────────────────────────────
-  const handleAiFill = async () => {
-    if (!fields.length) return;
-    setApplying(true);
-    setStatusMsg('');
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab.id) throw new Error('탭을 찾을 수 없습니다.');
-      const isAsc = tab.url?.includes('appstoreconnect.apple.com') ?? false;
-      const resp: MsgFillResponse = await chrome.runtime.sendMessage({
-        type: 'FILL_REQUEST', tabId: tab.id, fields, appMetadata, reviewInfo, isAsc, apiKey, aiModel, targetLanguage,
-      } satisfies MsgFillRequest);
-      if (!resp.success) throw new Error(resp.error);
-      const { filled, skipped } = resp.result!;
-      showStatus(`${filled}개 입력 완료${skipped > 0 ? `, ${skipped}개 건너뜀` : ''}`);
-    } catch (e) {
-      showStatus(e instanceof Error ? e.message : '오류 발생', true);
-    }
-    setApplying(false);
-  };
-
-  // ── 직접 입력 적용 ────────────────────────────────────────────────────
-  const handleDirectFill = async () => {
-    const fillMap: FillMap = {};
-    for (const f of fields) {
-      if (values[f.selector]) fillMap[f.selector] = values[f.selector];
-    }
-    if (!Object.keys(fillMap).length) { showStatus('입력된 값이 없습니다.', true); return; }
-    setApplying(true);
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab.id) throw new Error('탭을 찾을 수 없습니다.');
-      const resp: MsgApplyFillResponse = await chrome.tabs.sendMessage(tab.id, { type: 'APPLY_FILL', fillMap } satisfies MsgApplyFill);
-      const { filled, skipped } = resp?.result ?? { filled: 0, skipped: 0 };
-      showStatus(`${filled}개 입력 완료${skipped > 0 ? `, ${skipped}개 건너뜀` : ''}`);
-    } catch {
-      showStatus('적용 중 오류가 발생했습니다.', true);
-    }
-    setApplying(false);
   };
 
   const dispLabel = (f: EditableField) => f.label || f.placeholder || f.ariaLabel || f.name || f.selector;
@@ -279,7 +239,7 @@ export default function PageFieldsTab() {
         </div>
       )}
 
-      {/* ── 언어 선택 (생성/뷰/이름변경) ── */}
+      {/* ── 언어 선택 ── */}
       {(mode === 'create' || (selectedId && (mode === 'view' || mode === 'rename'))) && (
         <div className="pf-lang-row">
           <label className="pf-lang-label">입력 언어</label>
@@ -326,28 +286,25 @@ export default function PageFieldsTab() {
                   )}
                   <div className="pf-field-actions">
                     <span className="pf-type-tag">{f.type}</span>
+                    {scannedValues[f.selector] && (
+                      <span className="pf-val-tag" title={scannedValues[f.selector]}>값 있음</span>
+                    )}
                     <button className="pf-icon-btn pf-icon-btn--sm" onClick={() => startEdit(idx)} title="라벨 수정">✎</button>
                     <button className="pf-icon-btn pf-icon-btn--sm pf-icon-btn--danger" onClick={() => removeField(idx)} title="제거">✕</button>
                   </div>
                 </div>
-                {fillMode === 'direct' && (
-                  f.type === 'select' && f.options?.length ? (
-                    <select
-                      className="pf-val-select"
-                      value={values[f.selector] ?? ''}
-                      onChange={(e) => setValues((v) => ({ ...v, [f.selector]: e.target.value }))}
-                    >
-                      <option value="">선택</option>
-                      {f.options.map((o) => <option key={o.value} value={o.value}>{o.text}</option>)}
-                    </select>
-                  ) : (
+                {TEXT_TYPES.includes(f.type) && (
+                  <div className="pf-maxlength-row">
+                    <label className="pf-maxlength-label">최대 자릿수</label>
                     <input
-                      className="pf-val-input"
-                      placeholder="값 입력..."
-                      value={values[f.selector] ?? ''}
-                      onChange={(e) => setValues((v) => ({ ...v, [f.selector]: e.target.value }))}
+                      className="pf-maxlength-input"
+                      type="number"
+                      min={1}
+                      placeholder="제한 없음"
+                      value={f.maxLength ?? ''}
+                      onChange={(e) => updateMaxLength(idx, e.target.value)}
                     />
-                  )
+                  </div>
                 )}
               </div>
             ))}
@@ -365,25 +322,10 @@ export default function PageFieldsTab() {
             <button className="pf-add-field-btn" onClick={() => setShowAdd(true)}>＋ 필드 추가</button>
           )}
 
-          {/* ── 액션 바 ── */}
-          <div className="pf-action-bar">
-            <div className="pf-mode-toggle">
-              <button className={`pf-mode-btn${fillMode === 'ai' ? ' pf-mode-btn--on' : ''}`} onClick={() => setFillMode('ai')}>AI 자동입력</button>
-              <button className={`pf-mode-btn${fillMode === 'direct' ? ' pf-mode-btn--on' : ''}`} onClick={() => setFillMode('direct')}>직접 입력</button>
-            </div>
-            <div className="pf-action-btns">
-              {canSave && (
-                <button className="pf-save-btn" onClick={handleSave}>저장</button>
-              )}
-              <button
-                className="pf-apply-btn"
-                onClick={fillMode === 'ai' ? handleAiFill : handleDirectFill}
-                disabled={applying}
-              >
-                {applying ? '처리 중...' : fillMode === 'ai' ? '자동입력' : '적용'}
-              </button>
-            </div>
-          </div>
+          {/* ── 저장 버튼 ── */}
+          {canSave && (
+            <button className="pf-save-btn pf-save-btn--full" onClick={handleSave}>저장</button>
+          )}
         </>
       )}
 

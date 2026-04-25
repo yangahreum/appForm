@@ -42,7 +42,7 @@ export interface MsgApplyFillResponse {
 
 export interface MsgTranslateRequest {
   type: 'TRANSLATE_REQUEST';
-  values: Record<string, { label: string; value: string }>;
+  values: Record<string, { label: string; value: string; maxLength?: number }>;
   targetLanguage: string;
   apiKey: string;
   aiModel: string;

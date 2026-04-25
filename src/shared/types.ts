@@ -9,6 +9,7 @@ export interface FormField {
   options?: { value: string; text: string }[];
   currentValue?: string;
   radioValue?: string;
+  maxLength?: number;
 }
 
 export interface EditableField extends FormField {
@@ -81,17 +82,20 @@ export const AI_MODELS = [
 export type AiModelId = typeof AI_MODELS[number]['id'];
 
 export const SUPPORTED_LANGUAGES = [
-  { code: 'auto', label: '자동 감지 (Auto)' },
   { code: 'ko', label: '한국어' },
-  { code: 'en', label: 'English' },
-  { code: 'zh', label: '中文 (简体)' },
-  { code: 'ja', label: '日本語' },
-  { code: 'es', label: 'Español' },
-  { code: 'fr', label: 'Français' },
-  { code: 'ar', label: 'العربية' },
-  { code: 'hi', label: 'हिन्दी' },
-  { code: 'pt', label: 'Português' },
-  { code: 'ru', label: 'Русский' },
+  { code: 'en', label: '영어' },
+  { code: 'fr', label: '프랑스어' },
+  { code: 'it', label: '이탈리아어' },
+  { code: 'de', label: '독일어' },
+  { code: 'es', label: '스페인어' },
+  { code: 'zh-Hans', label: '중국어 (간체)' },
+  { code: 'zh-Hant', label: '중국어 (번체)' },
+  { code: 'ja', label: '일본어' },
+  { code: 'pt-BR', label: '브라질 포르투갈어' },
+  { code: 'pt', label: '포르투갈어' },
+  { code: 'ru', label: '러시아어' },
+  { code: 'id', label: '인도네시아어' },
+  { code: 'hi', label: '힌디어' },
 ] as const;
 
 export type LanguageCode = typeof SUPPORTED_LANGUAGES[number]['code'];
