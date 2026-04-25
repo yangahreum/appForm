@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Claude AI
+.claude/
+
+# macOS
+.DS_Store
+
+# Zip artifacts
+*.zip
+
+# Planning files
+plan.md
+
+# Environment
+.env
+.env.local

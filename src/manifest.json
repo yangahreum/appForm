@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "AppForm - AI 폼 자동입력",
+  "version": "1.0.0",
+  "description": "AI가 내 정보를 분석해 웹 폼을 자동으로 채워주는 확장 프로그램. 10개 언어 번역 지원.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "AppForm - AI 폼 자동입력"
+  },
+  "side_panel": {
+    "default_path": "src/popup/index.html"
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content-script.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["storage", "activeTab", "scripting", "sidePanel"],
+  "host_permissions": ["https://api.minimax.io/*", "https://api.anthropic.com/*", "https://generativelanguage.googleapis.com/*", "<all_urls>"]
+}
